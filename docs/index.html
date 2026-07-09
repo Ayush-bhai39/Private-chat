@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="google-site-verification" content="F-4NzIpECVnctfiaw-MFr36MNGupCjkJOabqYduMbk0" />
+    <title>Secret Chat — Private Messaging, Redefined</title>
+    <meta name="description" content="Download Secret Chat — a fully end-to-end encrypted private messaging app with disappearing stories and secure key management.">
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Ambient background glows -->
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="logo">Secret Chat</h1>
+            <p class="tagline">Private messaging, redefined.</p>
+        </header>
+
+        <!-- Download Section -->
+        <section class="download-section">
+            <div class="download-container">
+                <a id="download-btn-android" href="https://github.com/Ayush-bhai39/Private-chat/raw/main/app-release.apk" download="SecretChat.apk" class="download-btn">
+                    <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    <span>Download for Android</span>
+                </a>
+                <a id="download-btn-windows" href="https://github.com/Ayush-bhai39/Private-chat/raw/main/docs/secure_chat_installer.exe" download="SecretChatInstaller.exe" class="download-btn download-btn-windows">
+                    <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                        <line x1="8" y1="21" x2="16" y2="21"/>
+                        <line x1="12" y1="17" x2="12" y2="21"/>
+                    </svg>
+                    <span>Download for Windows</span>
+                </a>
+            </div>
+            <p class="version-label">Latest Release &bull; Direct Downloads</p>
+        </section>
+
+        <!-- Glass Card: Features -->
+        <section class="glass-card">
+            <h2 class="section-title">Why Secret Chat?</h2>
+            <div class="features-grid">
+                <div class="feature">
+                    <div class="feature-icon">🔒</div>
+                    <h3>End-to-End Encryption</h3>
+                    <p>Messages and media are encrypted locally on your device using RSA &amp; AES-256 keys. Only you and the recipient can read them — not even our servers.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🎬</div>
+                    <h3>Disappearing Stories</h3>
+                    <p>Share photos and moments that automatically expire and are permanently deleted from all servers after 24 hours. No backups, no traces.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🔑</div>
+                    <h3>Safe Key Management</h3>
+                    <p>Your cryptographic private keys live strictly in your device's hardware-backed secure storage. They are never transmitted, shared, or backed up to the cloud.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">💬</div>
+                    <h3>Real-Time Messaging</h3>
+                    <p>Instant delivery with push notifications, inline reply from the notification bar, read receipts, and a modern chat experience you already know and love.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">📝</div>
+                    <h3>Status Notes</h3>
+                    <p>Set short text notes visible to your friends — like a personal status or mood update that others can see on your profile circle.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🚫</div>
+                    <h3>No Ads, No Tracking</h3>
+                    <p>Secret Chat does not contain any advertisements, analytics trackers, or third-party SDKs that monitor your activity. Your data stays yours.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Glass Card: Terms & Privacy -->
+        <section class="glass-card">
+            <h2 class="section-title">Terms &amp; Privacy Policy</h2>
+            <div class="policy-list">
+                <div class="policy-item">
+                    <h4>1. Data We Process</h4>
+                    <p>When you register, we store your email address and display profile details (name, profile photo) to identify you to other users. Chat messages are stored in encrypted format in our secure cloud database and can only be decrypted by the intended recipient's private key.</p>
+                </div>
+                <div class="policy-item">
+                    <h4>2. Message Security &amp; Cryptography</h4>
+                    <p>All messaging uses full client-side encryption. Plain-text message content is never transmitted to, nor stored on, our servers. Encryption keys are negotiated peer-to-peer between sender and recipient devices.</p>
+                </div>
+                <div class="policy-item">
+                    <h4>3. Disappearing Content &amp; Third-Party Storage</h4>
+                    <p>Story media uploads are temporarily hosted using secure, anonymous file-hosting services and are programmatically deleted after 24 hours. No permanent logs, backups, or copies of story content are retained by us or any third party.</p>
+                </div>
+                <div class="policy-item">
+                    <h4>4. Your Rights &amp; Data Control</h4>
+                    <p>You retain full ownership and control of your account, messages, and local key store at all times. You may delete your account and all associated data by contacting us or through the in-app settings.</p>
+                </div>
+                <div class="policy-item">
+                    <h4>5. Agreement</h4>
+                    <p>By downloading and signing into Secret Chat, you acknowledge and agree to these privacy disclosures and terms of service as described above.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2026 Secret Chat. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>
