@@ -1,71 +1,55 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
 
 class StorageService {
-  Future<String> _uploadToSupabase(File file, String contentType) async {
+  Future<String> _uploadToCloudinary(File file) async {
     try {
       final doc = await FirebaseFirestore.instance.collection('metadata').doc('app_config').get();
       if (!doc.exists) {
         throw Exception("Firestore metadata/app_config document not found.");
       }
 
-      final supabaseUrl = doc.data()?['supabaseUrl'] as String? ?? '';
-      final supabaseAnonKey = doc.data()?['supabaseAnonKey'] as String? ?? '';
-      final supabaseBucket = doc.data()?['supabaseBucket'] as String? ?? 'secure-chat-media';
+      final cloudName = doc.data()?['cloudinaryCloudName'] as String? ?? '';
+      final uploadPreset = doc.data()?['cloudinaryUploadPreset'] as String? ?? '';
 
-      if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-        throw Exception("Supabase configuration (supabaseUrl, supabaseAnonKey) is missing in Firestore metadata/app_config.");
+      if (cloudName.isEmpty || uploadPreset.isEmpty) {
+        throw Exception("Cloudinary configuration (cloudinaryCloudName, cloudinaryUploadPreset) is missing in Firestore metadata/app_config.");
       }
 
-      // Clean trailing slash from URL if present
-      final cleanUrl = supabaseUrl.endsWith('/') 
-          ? supabaseUrl.substring(0, supabaseUrl.length - 1) 
-          : supabaseUrl;
+      // Construct Cloudinary upload endpoint (using 'auto' resource type to handle images and videos)
+      final uploadUrl = 'https://api.cloudinary.com/v1_1/$cloudName/auto/upload';
 
-      // Generate a unique filename using UUID
-      final originalName = file.path.split(Platform.pathSeparator).last;
-      final fileExt = originalName.split('.').last;
-      final randomId = const Uuid().v4();
-      final filename = '${DateTime.now().millisecondsSinceEpoch}_$randomId.$fileExt';
-      final filePath = 'media/$filename';
+      final request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
+      request.fields['upload_preset'] = uploadPreset;
+      request.files.add(await http.MultipartFile.fromPath('file', file.path));
 
-      // Construct REST upload URL
-      final uploadUrl = '$cleanUrl/storage/v1/object/$supabaseBucket/$filePath';
-
-      final bytes = await file.readAsBytes();
-
-      final response = await http.post(
-        Uri.parse(uploadUrl),
-        headers: {
-          'Authorization': 'Bearer $supabaseAnonKey',
-          'apikey': '$supabaseAnonKey',
-          'Content-Type': contentType,
-        },
-        body: bytes,
-      ).timeout(const Duration(seconds: 30));
+      final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
+      final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
-        // Construct the public URL to access the uploaded file
-        final publicUrl = '$cleanUrl/storage/v1/object/public/$supabaseBucket/$filePath';
-        print("Successfully uploaded to Supabase Storage: $publicUrl");
-        return publicUrl;
+        final data = json.decode(response.body);
+        final publicUrl = data['secure_url'] as String?;
+        if (publicUrl != null && publicUrl.isNotEmpty) {
+          print("Successfully uploaded to Cloudinary: $publicUrl");
+          return publicUrl;
+        }
+        throw Exception("Cloudinary response did not contain secure_url: ${response.body}");
       } else {
-        throw Exception("Supabase upload failed with status ${response.statusCode}: ${response.body}");
+        throw Exception("Cloudinary upload failed with status ${response.statusCode}: ${response.body}");
       }
     } catch (e) {
-      print("Supabase Upload Error: $e");
+      print("Cloudinary Upload Error: $e");
       rethrow;
     }
   }
 
   Future<String> uploadStoryMedia(File file, bool isImage) async {
-    final contentType = isImage ? 'image/jpeg' : 'video/mp4';
-    return _uploadToSupabase(file, contentType);
+    return _uploadToCloudinary(file);
   }
 
   Future<String> uploadMessageMedia(File file, String contentType) async {
-    return _uploadToSupabase(file, contentType);
+    return _uploadToCloudinary(file);
   }
 }
