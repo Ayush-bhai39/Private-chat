@@ -20,6 +20,8 @@ import 'package:secure_chat/widgets/animated_send_button.dart';
 import 'package:secure_chat/screens/settings_screen.dart'; // import SpringTap
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:secure_chat/services/call_service.dart';
+import 'package:secure_chat/services/block_service.dart';
+import 'package:secure_chat/services/report_service.dart';
 
 class ChatScreen extends StatefulWidget {
   static String? activeChatId;
@@ -47,6 +49,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isIncognitoKeyboard = false;
   bool _showEmojiPanel = false;
   bool _isLoadingMedia = false;
+  bool _isBlocked = false;
+  bool _isBlockedByOther = false;
 
   // Custom native Emojis list
   final List<String> _emojis = [
@@ -68,6 +72,16 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _sendMediaMessage(File file, String mediaType) async {
     if (_otherUser == null) return;
+
+    if (_isBlocked || _isBlockedByOther) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot send media. Block status active.'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+      return;
+    }
 
     final repliedId = _replyingToMessage?.id;
     final repliedSenderUid = _replyingToMessage?.senderUid;
@@ -402,6 +416,15 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() {
       _isIncognitoKeyboard = val == 'true';
     });
+    if (_otherUser != null) {
+      final blockService = BlockService();
+      final blocked = await blockService.isBlocked(currentUid, _otherUser!.uid);
+      final blockedByOther = await blockService.isBlocked(_otherUser!.uid, currentUid);
+      setState(() {
+        _isBlocked = blocked;
+        _isBlockedByOther = blockedByOther;
+      });
+    }
   }
 
   void _onTextChanged() {
@@ -423,6 +446,16 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _sendMessage() async {
     final text = _textController.text.trim();
     if (text.isEmpty || _otherUser == null) return;
+
+    if (_isBlocked || _isBlockedByOther) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot send message. Block status active.'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+      return;
+    }
 
     final repliedId = _replyingToMessage?.id;
     final repliedSenderUid = _replyingToMessage?.senderUid;
@@ -669,6 +702,16 @@ class _ChatScreenState extends State<ChatScreen> {
   void _startCall(String type) {
     if (_otherUser == null) return;
 
+    if (_isBlocked || _isBlockedByOther) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot place call. Block status active.'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+      return;
+    }
+
     Navigator.pushNamed(
       context,
       '/call',
@@ -678,6 +721,116 @@ class _ChatScreenState extends State<ChatScreen> {
         'isIncoming': false,
       },
     );
+  }
+
+  Future<void> _handleBlockToggle() async {
+    if (_otherUser == null) return;
+    final currentUid = _authService.currentUser!.uid;
+    final blockService = BlockService();
+
+    try {
+      if (_isBlocked) {
+        await blockService.unblockUser(currentUid, _otherUser!.uid);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unblocked @${_otherUser!.username}')),
+        );
+      } else {
+        await blockService.blockUser(currentUid, _otherUser!.uid);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Blocked @${_otherUser!.username}')),
+        );
+      }
+      await _loadSecuritySettings();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Action failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _handleReportProfile() async {
+    if (_otherUser == null) return;
+    final currentUid = _authService.currentUser!.uid;
+    
+    final reasonController = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surface,
+          title: const Text(
+            'Report User?',
+            style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Please specify the reason for reporting this user. This will be sent to moderation.',
+                style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Enter reason (e.g., harassment, spam, fake account)...',
+                  hintStyle: const TextStyle(fontFamily: 'Inter', color: AppTheme.textSecondary),
+                  filled: true,
+                  fillColor: AppTheme.surfaceLight.withOpacity(0.3),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (reasonController.text.trim().isNotEmpty) {
+                  Navigator.pop(context, true);
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+              child: const Text('Submit Report', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true && mounted) {
+      try {
+        final reportService = ReportService();
+        await reportService.reportUser(
+          reporterUid: currentUid,
+          reportedUid: _otherUser!.uid,
+          reason: reasonController.text.trim(),
+          chatId: _chatId,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Thank you. Your report has been submitted to the moderation team.'),
+              backgroundColor: AppTheme.accentPrimary,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to submit report: $e'),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -803,6 +956,34 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                         child: const Icon(Icons.videocam_rounded, color: Colors.white70, size: 20),
                       ),
+                    ),
+                    const SizedBox(width: 6),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert_rounded, color: Colors.white70),
+                      color: AppTheme.surface,
+                      onSelected: (value) {
+                        if (value == 'block') {
+                          _handleBlockToggle();
+                        } else if (value == 'report') {
+                          _handleReportProfile();
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'block',
+                          child: Text(
+                            _isBlocked ? 'Unblock User' : 'Block User',
+                            style: const TextStyle(fontFamily: 'Inter', color: Colors.white),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'report',
+                          child: Text(
+                            'Report User',
+                            style: TextStyle(fontFamily: 'Inter', color: AppTheme.error),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

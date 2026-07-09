@@ -7,6 +7,10 @@ import 'package:secure_chat/services/user_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secure_chat/screens/settings_screen.dart'; // import SpringTap
 import 'package:secure_chat/services/update_service.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:secure_chat/services/account_deletion_service.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -105,6 +109,115 @@ class _AccountScreenState extends State<AccountScreen> {
     await _authService.signOut();
     if (mounted) {
       Navigator.of(context).pushNamedAndRemoveUntil('/welcome', (route) => false);
+    }
+  }
+
+  Future<void> _handleExportData() async {
+    if (_currentUser == null) return;
+    setState(() => _isLoading = true);
+    try {
+      final service = AccountDeletionService();
+      final data = await service.exportUserData(_currentUser!.uid);
+      final jsonString = const JsonEncoder.withIndent('  ').convert(data);
+      
+      Directory? directory;
+      if (Platform.isAndroid) {
+        directory = Directory('/storage/emulated/0/Download');
+        if (!await directory.exists()) {
+          directory = await getExternalStorageDirectory();
+        }
+      } else {
+        directory = await getDownloadsDirectory() ?? await getApplicationDocumentsDirectory();
+      }
+      
+      if (directory == null) {
+        throw Exception("Could not find a valid downloads or documents directory.");
+      }
+      
+      final filePath = '${directory.path}/secure_chat_data_export_${_currentUser!.uid}.json';
+      final file = File(filePath);
+      await file.writeAsString(jsonString);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Data exported successfully to: ${file.path} 📂'),
+            backgroundColor: AppTheme.accentPrimary,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to export data: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleDeleteAccount() async {
+    if (_currentUser == null) return;
+    
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surface,
+          title: const Text(
+            'Delete Account?',
+            style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          content: const Text(
+            'This will permanently delete your account, all messages, stories, and data. This action cannot be undone.',
+            style: TextStyle(fontFamily: 'Inter', color: AppTheme.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+              child: const Text('Delete Forever', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true && mounted) {
+      setState(() => _isLoading = true);
+      try {
+        final service = AccountDeletionService();
+        await service.deleteAccount(_currentUser!.uid, _currentUser!.username);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Your account has been deleted permanently.'),
+              backgroundColor: AppTheme.accentPrimary,
+            ),
+          );
+          Navigator.of(context).pushNamedAndRemoveUntil('/welcome', (route) => false);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to delete account: $e'),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
+      } finally {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -423,6 +536,154 @@ class _AccountScreenState extends State<AccountScreen> {
                                       Icons.copy_rounded,
                                       color: AppTheme.textSecondary,
                                       size: 18,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Export My Data Card
+                            SpringTap(
+                              onTap: _handleExportData,
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppTheme.surfaceLight.withOpacity(0.3),
+                                      AppTheme.surfaceLight.withOpacity(0.15),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppTheme.surfaceLight.withOpacity(0.4),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: const LinearGradient(
+                                          colors: [Colors.blueAccent, Colors.cyanAccent],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.download_rounded,
+                                        color: Colors.white,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Export My Data',
+                                            style: TextStyle(
+                                              fontFamily: 'Inter',
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Download a copy of your personal data',
+                                            style: TextStyle(
+                                              fontFamily: 'Inter',
+                                              fontSize: 12,
+                                              color: AppTheme.textSecondary.withOpacity(0.8),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: AppTheme.textSecondary,
+                                      size: 22,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 16),
+
+                            // Delete My Account Card
+                            SpringTap(
+                              onTap: _handleDeleteAccount,
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      AppTheme.error.withOpacity(0.2),
+                                      AppTheme.error.withOpacity(0.08),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppTheme.error.withOpacity(0.3),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: AppTheme.error.withOpacity(0.2),
+                                      ),
+                                      child: const Icon(
+                                        Icons.delete_forever_rounded,
+                                        color: AppTheme.error,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            'Delete My Account',
+                                            style: TextStyle(
+                                              fontFamily: 'Inter',
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Permanently erase all your chat history and profile',
+                                            style: TextStyle(
+                                              fontFamily: 'Inter',
+                                              fontSize: 12,
+                                              color: AppTheme.textSecondary.withOpacity(0.8),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.chevron_right_rounded,
+                                      color: AppTheme.textSecondary,
+                                      size: 22,
                                     ),
                                   ],
                                 ),

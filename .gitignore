@@ -50,3 +50,6 @@ service-account.json
 # Firebase Android config
 android/app/google-services.json
 
+# Android signing keys
+android/app/key.jks
+android/app/key.properties

@@ -25,6 +25,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   bool _isSigningIn = false;
   bool _obscurePassword = true;
   bool _acceptTerms = false;
+  bool _confirmAge = false;
 
   late final AnimationController _logoController;
   late final AnimationController _titleController;
@@ -197,6 +198,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       );
       return;
     }
+    if (!_isLogin && !_confirmAge) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please confirm that you are 16 years or older to register.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
     if (!_formKey.currentState!.validate() || _isSigningIn) return;
     setState(() => _isSigningIn = true);
 
@@ -264,6 +274,15 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please accept the Privacy Policy & Terms to continue.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    if (!_isLogin && !_confirmAge) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please confirm that you are 16 years or older to register.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -622,6 +641,33 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             ),
                           ],
                         ),
+                        if (!_isLogin) ...[
+                          const SizedBox(height: 8),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: Checkbox(
+                                  value: _confirmAge,
+                                  onChanged: (val) => setState(() => _confirmAge = val ?? false),
+                                  activeColor: AppTheme.accentPrimary,
+                                  side: const BorderSide(color: AppTheme.textSecondary),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'I confirm that I am 16 years or older',
+                                style: TextStyle(
+                                  fontFamily: 'Inter',
+                                  fontSize: 12,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 16),
 
                         // Submit Button
@@ -752,41 +798,74 @@ class _WelcomeScreenState extends State<WelcomeScreen>
             'Privacy Policy & Terms',
             style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
           ),
-          content: const SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  '1. End-to-End Encryption',
-                  style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.accentPrimary),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Your messages and media are encrypted locally before being sent. Nobody—including us—can decrypt or read them.',
-                  style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppTheme.textSecondary),
-                ),
-                SizedBox(height: 12),
-                Text(
-                  '2. Account Data Collection',
-                  style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.accentPrimary),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Signing in via Google or email registers your email and profile details to match you with other users. We do not track or share this information.',
-                  style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppTheme.textSecondary),
-                ),
-                SizedBox(height: 12),
-                Text(
-                  '3. Data Storage & Deletion',
-                  style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.accentPrimary),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Stories are hosted temporarily via Litterbox and are auto-deleted after 24 hours. Messages are stored securely on Firestore.',
-                  style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppTheme.textSecondary),
-                ),
-              ],
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '1. End-to-End Encryption',
+                    style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.accentPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'All message content, calls, and media are encrypted locally before transmission using hybrid RSA-2048 and AES-256 cryptography. Only the intended recipient can read your messages; we cannot decrypt them.',
+                    style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '2. Minimally Processed Data',
+                    style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.accentPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'We store only basic identifiers needed to connect you with contacts: your email, chosen username, display name, public encryption key, and profile picture url. We collect FCM push tokens for message delivery notifications.',
+                    style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '3. No Ads, No Tracking',
+                    style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.accentPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'SecureChat contains no advertising SDKs, analytics tracking suites, or profiling software. Your usage habits remain strictly private.',
+                    style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '4. Third-Party Services',
+                    style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.accentPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'For media/stories, we temporarily host files on secure third-party platforms (Litterbox/ImgBB) which auto-delete in 24 hours. Voice/video signaling is facilitated peer-to-peer using Google STUN servers.',
+                    style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '5. User Data Rights (GDPR/CCPA/DPDPA)',
+                    style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.accentPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'You have the right to access and delete your data. Under Account settings, you can export a full copy of your profile/chat metadata or permanently delete your account, which erases all of your history from our servers.',
+                    style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '6. Age Limitations',
+                    style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.accentPrimary),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'SecureChat is strictly intended for individuals 16 years of age or older. Underage accounts will be terminated immediately upon discovery.',
+                    style: TextStyle(fontFamily: 'Inter', fontSize: 12, color: AppTheme.textSecondary),
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [

@@ -79,6 +79,7 @@ class UserService {
         username: username,
         publicKey: publicKeyPem,
         createdAt: DateTime.now(),
+        ageConfirmedAt: DateTime.now(),
       );
       return;
     }
@@ -97,6 +98,7 @@ class UserService {
       username: username,
       publicKey: publicKeyPem,
       createdAt: DateTime.now(),
+      ageConfirmedAt: DateTime.now(),
     );
 
     final batch = _firestore.batch();

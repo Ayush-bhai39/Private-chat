@@ -15,6 +15,8 @@ class UserModel {
   final List<String> following;
   final List<String> followRequests;
   final String fcmToken;
+  final List<String> blockedUsers;
+  final DateTime? ageConfirmedAt;
 
   const UserModel({
     required this.uid,
@@ -29,6 +31,8 @@ class UserModel {
     this.following = const [],
     this.followRequests = const [],
     this.fcmToken = '',
+    this.blockedUsers = const [],
+    this.ageConfirmedAt,
   });
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
@@ -49,6 +53,12 @@ class UserModel {
       following: List<String>.from(map['following'] ?? []),
       followRequests: List<String>.from(map['followRequests'] ?? []),
       fcmToken: map['fcmToken'] as String? ?? '',
+      blockedUsers: List<String>.from(map['blockedUsers'] ?? []),
+      ageConfirmedAt: map['ageConfirmedAt'] is Timestamp
+          ? (map['ageConfirmedAt'] as Timestamp).toDate()
+          : map['ageConfirmedAt'] is DateTime
+              ? map['ageConfirmedAt'] as DateTime
+              : null,
     );
   }
 
@@ -66,6 +76,8 @@ class UserModel {
       'following': following,
       'followRequests': followRequests,
       'fcmToken': fcmToken,
+      'blockedUsers': blockedUsers,
+      'ageConfirmedAt': ageConfirmedAt != null ? Timestamp.fromDate(ageConfirmedAt!) : null,
     };
   }
 
@@ -82,6 +94,8 @@ class UserModel {
     List<String>? following,
     List<String>? followRequests,
     String? fcmToken,
+    List<String>? blockedUsers,
+    DateTime? ageConfirmedAt,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -96,6 +110,8 @@ class UserModel {
       following: following ?? this.following,
       followRequests: followRequests ?? this.followRequests,
       fcmToken: fcmToken ?? this.fcmToken,
+      blockedUsers: blockedUsers ?? this.blockedUsers,
+      ageConfirmedAt: ageConfirmedAt ?? this.ageConfirmedAt,
     );
   }
 

@@ -6,6 +6,8 @@ import 'package:secure_chat/services/user_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:secure_chat/screens/settings_screen.dart'; // for SpringTap
 import 'package:secure_chat/services/update_service.dart';
+import 'package:secure_chat/services/block_service.dart';
+import 'package:secure_chat/services/report_service.dart';
 
 class ProfileViewScreen extends StatefulWidget {
   const ProfileViewScreen({super.key});
@@ -25,6 +27,7 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
   bool _hasRequested = false;
   bool _isUpdateAvailable = false;
   Map<String, dynamic>? _updateInfo;
+  bool _isBlocked = false;
 
   @override
   void didChangeDependencies() {
@@ -46,10 +49,13 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
       final currentUid = _authService.currentUser!.uid;
       final freshData = await _userService.getUserData(_targetUser!.uid);
       if (freshData != null) {
+        final blockService = BlockService();
+        final blocked = await blockService.isBlocked(currentUid, freshData.uid);
         setState(() {
           _targetUser = freshData;
           _isFollowing = freshData.followers.contains(currentUid);
           _hasRequested = freshData.followRequests.contains(currentUid);
+          _isBlocked = blocked;
         });
 
         // Load stories count if public or following
@@ -108,6 +114,121 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
     }
   }
 
+  Future<void> _handleBlockToggle() async {
+    if (_targetUser == null) return;
+    final currentUid = _authService.currentUser!.uid;
+    final blockService = BlockService();
+
+    setState(() => _isLoading = true);
+    try {
+      if (_isBlocked) {
+        await blockService.unblockUser(currentUid, _targetUser!.uid);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Unblocked @${_targetUser!.username}')),
+        );
+      } else {
+        await blockService.blockUser(currentUid, _targetUser!.uid);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Blocked @${_targetUser!.username}')),
+        );
+      }
+      await _loadFreshProfile();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Action failed: $e')),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleReportProfile() async {
+    if (_targetUser == null) return;
+    final currentUid = _authService.currentUser!.uid;
+    
+    final reasonController = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: AppTheme.surface,
+          title: const Text(
+            'Report User?',
+            style: TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.bold, color: Colors.white),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Please specify the reason for reporting this profile. This will be sent to moderation.',
+                style: TextStyle(fontFamily: 'Inter', fontSize: 13, color: AppTheme.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: reasonController,
+                maxLines: 3,
+                style: const TextStyle(fontFamily: 'Inter', color: Colors.white, fontSize: 14),
+                decoration: InputDecoration(
+                  hintText: 'Enter reason (e.g., harassment, spam, fake account)...',
+                  hintStyle: const TextStyle(fontFamily: 'Inter', color: AppTheme.textSecondary),
+                  filled: true,
+                  fillColor: AppTheme.surfaceLight.withOpacity(0.3),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel', style: TextStyle(color: AppTheme.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (reasonController.text.trim().isNotEmpty) {
+                  Navigator.pop(context, true);
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+              child: const Text('Submit Report', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true && mounted) {
+      setState(() => _isLoading = true);
+      try {
+        final reportService = ReportService();
+        await reportService.reportUser(
+          reporterUid: currentUid,
+          reportedUid: _targetUser!.uid,
+          reason: reasonController.text.trim(),
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Thank you. Your report has been submitted to the moderation team.'),
+              backgroundColor: AppTheme.accentPrimary,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to submit report: $e'),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
+      } finally {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_targetUser == null) {
@@ -155,6 +276,34 @@ class _ProfileViewScreenState extends State<ProfileViewScreen> {
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
+                    ),
+                    const Spacer(),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+                      color: AppTheme.surface,
+                      onSelected: (value) {
+                        if (value == 'block') {
+                          _handleBlockToggle();
+                        } else if (value == 'report') {
+                          _handleReportProfile();
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'block',
+                          child: Text(
+                            _isBlocked ? 'Unblock User' : 'Block User',
+                            style: const TextStyle(fontFamily: 'Inter', color: Colors.white),
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'report',
+                          child: Text(
+                            'Report Profile',
+                            style: TextStyle(fontFamily: 'Inter', color: AppTheme.error),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

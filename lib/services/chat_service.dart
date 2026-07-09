@@ -163,7 +163,7 @@ class ChatService {
     await _firestore.collection('chats').doc(chatId).set(
       {
         'participants': [senderUid, recipientUid],
-        'lastMessage': mediaType == 'gif' ? '🎬 Animated GIF' : plaintext,
+        'lastMessage': mediaType == 'gif' ? '🎬 Animated GIF' : (mediaType == 'image' ? '📷 Photo' : (mediaType == 'video' ? '🎥 Video' : '🔒 Encrypted message')),
         'lastMessageTime': FieldValue.serverTimestamp(),
         'unreadCount': {
           recipientUid: FieldValue.increment(1),
@@ -442,6 +442,8 @@ class ChatService {
         .snapshots()
         .asyncMap((snapshot) async {
       final conversations = <ConversationModel>[];
+      final currentUserData = await _userService.getUserData(currentUid);
+      final myBlockedUsers = currentUserData?.blockedUsers ?? [];
       for (final doc in snapshot.docs) {
         final data = doc.data();
         final participants = List<String>.from(data['participants'] ?? []);
@@ -450,6 +452,11 @@ class ChatService {
 
         final otherUser = await _userService.getUserData(otherUid);
         if (otherUser == null) continue;
+
+        // Skip blocked users
+        if (myBlockedUsers.contains(otherUid) || otherUser.blockedUsers.contains(currentUid)) {
+          continue;
+        }
 
         // Skip conversation details if the other user has a private profile and does not follow the current user
         // (Wait! To make E2EE secure and follow requests functional, if target user is private, we can restrict chats unless following)
@@ -555,7 +562,7 @@ class ChatService {
     batch.update(
       _firestore.collection('chats').doc(chatId),
       {
-        'lastMessage': newPlaintext,
+        'lastMessage': '🔒 Encrypted message (edited)',
         'lastMessageTime': FieldValue.serverTimestamp(),
       },
     );
