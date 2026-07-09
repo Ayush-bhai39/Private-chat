@@ -13,7 +13,6 @@ import 'package:secure_chat/services/encryption_service.dart';
 import 'package:secure_chat/services/user_service.dart';
 import 'package:secure_chat/services/mock_config.dart';
 import 'package:http/http.dart' as http;
-import 'package:googleapis_auth/auth_io.dart';
 
 class ChatService {
   FirebaseFirestore get _firestore => FirebaseFirestore.instance;
@@ -240,55 +239,48 @@ class ChatService {
     try {
       final recipientUser = await _userService.getUserData(recipientUid);
       if (recipientUser != null && recipientUser.fcmToken.isNotEmpty) {
-        final saDoc = await _firestore.collection('metadata').doc('service_account').get();
-        if (saDoc.exists && saDoc.data() != null) {
-          final saJsonStr = saDoc.data()!['configJson'] as String?;
-          if (saJsonStr != null && saJsonStr.isNotEmpty) {
-            final saMap = json.decode(saJsonStr) as Map<String, dynamic>;
-            final SaProjectId = saMap['project_id'] as String?;
-            if (SaProjectId != null && SaProjectId.isNotEmpty) {
-              final senderUser = await _userService.getUserData(senderUid);
-              final senderName = senderUser?.displayName ?? 'New Message';
-              final messageBody = mediaType == 'gif' ? '🎬 Animated GIF' : (mediaType == 'image' ? '📷 Photo' : (mediaType == 'video' ? '🎥 Video' : plaintext));
+        final doc = await _firestore.collection('metadata').doc('app_config').get();
+        final uploadUrl = doc.exists ? (doc.data()?['cloudflareUploadUrl'] as String? ?? '') : '';
+        
+        if (uploadUrl.isEmpty) {
+          print("Warning: Cloudflare upload URL is not configured. Skipping push notification.");
+          return;
+        }
 
-              // Generate OAuth 2.0 Access Token
-              final accountCredentials = ServiceAccountCredentials.fromJson(saJsonStr);
-              final scopes = ['https://www.googleapis.com/auth/firebase.messaging'];
-              final authClient = await clientViaServiceAccount(accountCredentials, scopes);
-              final accessToken = authClient.credentials.accessToken.data;
-              authClient.close();
+        final workerUri = Uri.parse(uploadUrl);
+        final notificationUri = Uri(
+          scheme: workerUri.scheme,
+          host: workerUri.host,
+          path: '/send-notification',
+        );
 
-              // Send FCM v1 POST Request
-              final url = Uri.parse('https://fcm.googleapis.com/v1/projects/$SaProjectId/messages:send');
-              final headers = {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer $accessToken',
-              };
-              final body = json.encode({
-                'message': {
-                  'token': recipientUser.fcmToken,
-                  'data': {
-                    'title': senderName,
-                    'body': messageBody,
-                    'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-                    'type': 'message',
-                    'chatId': chatId,
-                    'senderUid': senderUid,
-                    'messageId': messageId,
-                  },
-                  'android': {
-                    'priority': 'high',
-                  }
-                }
-              });
+        final senderUser = await _userService.getUserData(senderUid);
+        final senderName = senderUser?.displayName ?? 'New Message';
+        final messageBody = mediaType == 'gif' 
+            ? '🎬 Animated GIF' 
+            : (mediaType == 'image' 
+                ? '📷 Photo' 
+                : (mediaType == 'video' ? '🎥 Video' : plaintext));
 
-              await http.post(url, headers: headers, body: body).timeout(const Duration(seconds: 5));
-            }
-          }
+        final response = await http.post(
+          notificationUri,
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'token': recipientUser.fcmToken,
+            'title': senderName,
+            'body': messageBody,
+            'chatId': chatId,
+            'senderUid': senderUid,
+            'messageId': messageId,
+          }),
+        ).timeout(const Duration(seconds: 5));
+
+        if (response.statusCode != 200) {
+          print("Failed to send push notification via Cloudflare Worker: ${response.statusCode} ${response.body}");
         }
       }
     } catch (e) {
-      print("Error sending FCM v1 notification: $e");
+      print("Error sending push notification via Worker: $e");
     }
   }
 
